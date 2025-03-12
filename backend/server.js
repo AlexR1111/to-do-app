@@ -33,7 +33,7 @@ app.get('/ralf', (req, res) => {
 // Wenn ein neues Item hinzugefügt werden soll, soll NodeJS Server diesen Request so behandeln:
 app.post('/add', (req, res) => {
     db.run('INSERT INTO tasks (title) VALUES (?)', [req.body.title], function () {
-        res.json({tag: "Mittwoch", bald_wirds: "Mittagspause"});
+        res.json({id: this.lastID, title:req.body.title, completed: 0});
     });
 });
 
@@ -46,7 +46,9 @@ app.get('/liste_abrufen', (req, res) => {
     })
 });
 
-
+app.delete('/delete/:id', (req, res) => {
+    db.run('DELETE FROM tasks WHERE id=?', req.params.id, () => {res.json({message: "Eingabe gelöscht"})});
+})
 
 app.listen(3050, "localhost", () => {
     console.log("bald wird es Mittagspause")
