@@ -18,6 +18,7 @@ function App() {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({title}),
     });
+    //hier möchte ich dass die liste in der app auch aktualisiert wird
     setTitle("");
   }
   
