@@ -9,7 +9,7 @@ function App() {
     fetch("http://localhost:3050/liste_abrufen")
     .then((res) => res.json())
     .then(setTasks)
-  }, []);
+  }, [tasks]);
 
   const itemHinzufuegen = () => {
 
@@ -32,7 +32,11 @@ function App() {
     fetch (`http://localhost:3050/delete/${id_nummer}`, {
       method: "DELETE",
     })
-    .then()
+    .then((res) => {
+      if (res.ok) {
+        setTasks(tasks.filter((task) => task.id !== id_nummer));
+      }
+    });
   console.log(tasks)
 
   return (
