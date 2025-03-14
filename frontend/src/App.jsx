@@ -37,7 +37,8 @@ function App() {
         setTasks(tasks.filter((task) => task.id !== id_nummer));
       }
     });
-  console.log(tasks)
+console.log(tasks)
+  }
 
   return (
     <>
