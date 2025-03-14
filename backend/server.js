@@ -1,71 +1,80 @@
 const express = require('express');
-const sqlite3 = require('sqlite3');
-const {Pool} = require('pg')
+const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-require('dotenv').config()
+require('dotenv').config();
+
 const app = express();
+const port = 3050;
 
-//TODO: Verbinde eine Datenbank dazu
-
-const db = new sqlite3.Database('./tasks.db');
+// PostgreSQL connection pool
 const pool = new Pool({
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT
-})
+});
 
+app.use(cors());
+app.use(bodyParser.json());
 
-app.use(cors());                // Middleware
-app.use(bodyParser.json());     // Middleware (wie ein Übersetzer)
+// Create tasks table (runs when server starts)
+pool.query(`
+  CREATE TABLE IF NOT EXISTS tasks (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    completed BOOLEAN DEFAULT false
+  )
+`, (err) => {
+  if (err) {
+    console.error('Error creating tasks table:', err.message);
+  } else {
+    console.log('Tasks table ready!');
+  }
+});
 
-
-db.run('CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, completed BOOLEAN DEFAULT 0)');
-
-
-//TODO: Schreibe requests/responses
-
-
+// Root route
 app.get('/', (req, res) => {
-    res.send('genau'
-);});
-
-app.get('/lachs_suschi', (req, res) => {
-    res.send("hier ist ein leckeres Lachs Sushi!"
-)});
-
-app.get('/ralf', (req, res) => {
-    res.send('vielen Dank Ralf');
+  res.send('Welcome to the task manager API!');
 });
 
-// Wenn ein neues Item hinzugefügt werden soll, soll NodeJS Server diesen Request so behandeln:
-app.post('/add', async(req, res) => {
-    const result = await pool.query('INSERT INTO tasks (title) VALUES (?)', [req.body-title])
-    res.json(result.row)
-
-    //db.run('INSERT INTO tasks (title) VALUES (?)', [req.body.title], function () {
-    //    res.json({id: this.lastID, title:req.body.title, completed: 0});
-  //  });
+// Add a new task
+app.post('/add', async (req, res) => {
+  try {
+    const { title } = req.body;
+    const result = await pool.query(
+      'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
+      [title]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
-
-// Liste mir alle existierende Items
-// hier sollte nur alle Items als JSON im Response geschrieben werden
+// Get all tasks
 app.get('/liste_abrufen', async (req, res) => {
-    const result = await pool.query('SELECT * FROM tasks')
-    res.json(result.rows)
-
-    //db.all('SELECT * FROM tasks', function (err, rows){
-      //  res.json(rows);
-    //})
+  try {
+    const result = await pool.query('SELECT * FROM tasks');
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
-app.delete('/delete/:id', (req, res) => {
-    db.run('DELETE FROM tasks WHERE id=?', req.params.id, () => {res.json({message: "Eingabe gelöscht"})});
-})
+// Delete a task by ID
+app.delete('/delete/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
+    res.json({ message: 'Task deleted', taskId: id });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
-app.listen(3050, "localhost", () => {
-    console.log("bald wird es Mittagspause")
+// Start server
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
 });
