@@ -1,17 +1,7 @@
-FROM node:18-alpine
+FROM nginx:1.27.4-alpine
 
-WORKDIR /app
+COPY /dist /usr/share/nginx/html
 
-COPY package.json package-lock.json ./
+EXPOSE 80
 
-RUN npm install
-
-COPY . .
-
-RUN npm run build
-
-RUN npm install -g serve
-
-EXPOSE 5173
-
-CMD ["serve", "-s","build","-l","5173", "devdocker"]
+CMD [ "nginx", "-g", "daemon off" ]
