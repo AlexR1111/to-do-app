@@ -1,80 +1,119 @@
 const express = require('express');
-const { Pool } = require('pg');
+// const sqlite3 = require('sqlite3');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 require('dotenv').config();
+const { Pool } = require('pg');
+
 
 const app = express();
-const port = 3050;
 
-// PostgreSQL connection pool
+//TODO: Verbinde eine Datenbank dazu
+
+// const db = new sqlite3.Database('./tasks.db');
+app.use(cors());                // Middleware
+app.use(bodyParser.json());     // Middleware (wie ein Übersetzer)
+
+
+// db.run('CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, completed BOOLEAN DEFAULT 0)');
+
+
 const pool = new Pool({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT
+    user: process.env.DB_USER,         // Dein PostgreSQL-Benutzername
+    host: process.env.DB_HOST,         // z. B. 'localhost'
+    database: process.env.DB_NAME,     // Name deiner Datenbank
+    password: process.env.DB_PASSWORD, // Dein Passwort
+    port: process.env.DB_PORT, // Standardport für PostgreSQL
 });
 
-app.use(cors());
-app.use(bodyParser.json());
 
-// Create tasks table (runs when server starts)
-pool.query(`
-  CREATE TABLE IF NOT EXISTS tasks (
-    id SERIAL PRIMARY KEY,
-    title TEXT NOT NULL,
-    completed BOOLEAN DEFAULT false
-  )
-`, (err) => {
-  if (err) {
-    console.error('Error creating tasks table:', err.message);
-  } else {
-    console.log('Tasks table ready!');
-  }
-});
+////
 
-// Root route
+const createTable = async () => {
+    const client = await pool.connect();
+    try {
+      await client.query(`
+        
+      CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          username VARCHAR(50) NOT NULL UNIQUE,
+          email VARCHAR(100) NOT NULL UNIQUE,
+          password TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS todos (
+          id SERIAL PRIMARY KEY,
+          task TEXT NOT NULL,
+          completed BOOLEAN DEFAULT FALSE,
+          user_id INTEGER NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      INSERT INTO users (username, email, password) VALUES ('testuser', 'test@example.com', 'hashedpassword');
+
+      `);
+      console.log("✅ Table 'users' created!");
+    } catch (err) {
+      console.error("❌ Error creating table:", err);
+    } finally {
+      client.release();
+    }
+  };
+  
+  createTable();
+
+//TODO: Schreibe requests/responses
+
+
 app.get('/', (req, res) => {
-  res.send('Welcome to the task manager API!');
-});
+    res.send('genau'
+);});
 
-// Add a new task
-app.post('/add', async (req, res) => {
-  try {
-    const { title } = req.body;
-    const result = await pool.query(
-      'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
-      [title]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
 
-// Get all tasks
+// Liste mir alle existierende Items
+// hier sollte nur alle Items als JSON im Response geschrieben werden
 app.get('/liste_abrufen', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM tasks');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+    try {
+        const result = await pool.query('SELECT * FROM todos');
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Fehler beim Abrufen der Liste:", error);
+    }
+    });
+
+
+// Wenn ein neues Item hinzugefügt werden soll, soll NodeJS Server diesen Request so behandeln:
+app.post('/add', async (req, res) => {
+    const result = await pool.query('INSERT INTO todos (task, user_id) VALUES ($1, 1) RETURNING *', [req.body.title]);
+    res.json(result.rows[0])
 });
 
-// Delete a task by ID
+
 app.delete('/delete/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
-    res.json({ message: 'Task deleted', taskId: id });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+    try {
+    const result = await pool.query('DELETE FROM todos WHERE id = $1 RETURNING *', [req.params.id,],);
+    res.json(result.rows);
+    } catch (error) {
+        console.error("Fehler beim Löschen:", error);
+        res.status(500).json({ error: "Interner Serverfehler" });
+    }
+})
+
+
+app.patch('/update/:id', async (req, res) => {
+
+    try {
+        const result = await pool.query(
+            'UPDATE todos SET completed = $1 WHERE id = $2 RETURNING *',
+            [req.body.completed, req.params.id]
+        );
+        res.json(result.rows[0]); // Aktualisiertes To-Do zurückgeben
+    } catch (error) {
+        console.error("Fehler beim Aktualisieren:", error);
+        res.status(500).json({ error: "Interner Serverfehler" });
+    }
 });
 
-// Start server
-app.listen(3050,"0.0.0.0", () => {
-  console.log(`Server running at http://localhost:${port}`);
+app.listen(3050, "0.0.0.0", () => {
+    console.log("Server Online")
 });
